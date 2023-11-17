@@ -1,0 +1,150 @@
+DNS config ---------------------------------------------------------------------------
+
+    $TTL 1D: Define o tempo de vida padrão (Time to Live) para os registros na zona como 1 dia.
+
+    @ IN SOA dns-server. admin.angelita.corp. (...): Define o início de uma declaração de recurso "Start of Authority" (SOA). Isso especifica informações sobre a zona. As informações incluem o servidor DNS primário (dns-server.), o endereço de e-mail do administrador (admin.angelita.corp.), e uma série de parâmetros, como serial, refresh, retry, expire e minimum TTL.
+            2023111501: Número de série da zona, geralmente aumentado a cada alteração na zona.
+            3H: Tempo em que os servidores secundários devem aguardar antes de verificar se há atualizações.
+            15M: Tempo que os servidores secundários devem aguardar antes de tentar novamente se a atualização falhar.
+            1W: Tempo máximo que um servidor secundário pode esperar antes de considerar os dados desatualizados.
+            1D: Tempo mínimo que um cliente DNS deve esperar antes de fazer uma nova consulta para o mesmo registro.
+
+    @ IN NS dns-server.: Define o servidor DNS primário para a zona.
+
+    @ IN A 192.0.2.2: Associa o endereço IPv4 192.0.2.2 ao domínio raiz (@).
+
+    @ IN AAAA 2001:0db8:abcd:ef01:0123:4567:89ab:cdef: Associa o endereço IPv6 2001:0db8:abcd:ef01:0123:4567:89ab:cdef ao domínio raiz (@).
+
+    www IN A 192.0.2.10: Associa o endereço IPv4 192.0.2.10 ao subdomínio "www".
+
+    intranet IN A 192.0.2.30: Associa o endereço IPv4 192.0.2.30 ao subdomínio "intranet".
+
+    mail IN A 192.0.2.20: Associa o endereço IPv4 192.0.2.20 ao subdomínio "mail".
+
+    mail IN AAAA 2001:0db8:abcd:ef01:0123:4567:89ab:cdef: Associa o endereço IPv6 2001:0db8:abcd:ef01:0123:4567:89ab:cdef ao subdomínio "mail".
+
+    @ IN MX 10 mail.angelita.corp: Define a prioridade do servidor de e-mail para o domínio raiz (@). Neste caso, o servidor de e-mail é "mail.angelita.corp" com uma prioridade de 10.
+
+    ftp IN CNAME www.angelita.corp: Cria um alias para o subdomínio "ftp", apontando para o mesmo endereço que "www.angelita.corp". Isso é útil quando você deseja que vários subdomínios apontem para o mesmo local físico.
+
+    
+named.conf.options ----------------------------------------------
+    options {: Início da seção de opções do BIND.
+
+    directory "/var/cache/bind";: Define o diretório onde o BIND armazenará seus arquivos de cache. O cache é usado para armazenar temporariamente as respostas DNS, o que pode melhorar o desempenho e reduzir a carga nos servidores DNS upstream.
+
+    recursion yes;: Habilita a recursão no servidor DNS. Quando um servidor DNS é configurado para recursão, ele é capaz de fazer consultas em nome dos clientes, pesquisando a hierarquia de servidores DNS para obter a resposta completa.
+
+    listen-on { any; };: Especifica em quais endereços IP o servidor BIND estará escutando por consultas DNS. Neste caso, "any" significa que o servidor BIND aceitará consultas em qualquer interface de rede disponível.
+
+    forwarders { 8.8.8.8; 4.4.4.4; };: Define servidores DNS para os quais o BIND encaminhará consultas que não pode responder localmente. Neste exemplo, as consultas serão encaminhadas para os servidores DNS do Google (8.8.8.8 e 4.4.4.4). Isso é útil quando o servidor BIND não tem a resposta em seu cache e precisa pedir a outros servidores DNS na Internet.
+
+    };: Fim da seção de opções do BIND.
+
+intranet/nginx.conf -----------------------------------------------
+    user www-data;: Define o usuário sob o qual o processo do Nginx será executado. Em muitos sistemas Unix-like, www-data é o usuário padrão para servidores web.
+
+    worker_processes auto;: Especifica o número de processos de trabalho que o Nginx deve iniciar automaticamente. O valor "auto" geralmente faz com que o Nginx ajuste automaticamente o número de processos com base nas características do sistema.
+
+    pid /run/nginx.pid;: Especifica o caminho para o arquivo PID (Process ID) do processo principal do Nginx. Este arquivo contém o ID do processo principal, facilitando a gestão do servidor.
+
+    error_log /var/log/nginx/error.log;: Define o caminho para o arquivo de log de erros do Nginx. Aqui, os erros serão registrados em "/var/log/nginx/error.log".
+
+    include /etc/nginx/modules-enabled/*.conf;: Inclui arquivos de configuração de módulos que estão habilitados.
+
+    events { ... }: Define configurações específicas para eventos (como conexões) no Nginx.
+        worker_connections 768;: Limita o número de conexões simultâneas que cada processo de trabalho pode manipular.
+
+    http { ... }: Início da configuração para o bloco HTTP.
+
+        sendfile on;: Ativa a diretiva sendfile, que utiliza o sistema de chamada de sistema sendfile para melhorar a eficiência na transferência de arquivos.
+
+        tcp_nopush on;: Ativa a diretiva tcp_nopush, que otimiza a transmissão de arquivos através de uma conexão TCP.
+
+        types_hash_max_size 2048;: Define o tamanho máximo do hash para os tipos de arquivos.
+
+        include /etc/nginx/mime.types;: Inclui o arquivo que mapeia extensões de arquivo para tipos MIME.
+
+        default_type application/octet-stream;: Define o tipo MIME padrão a ser usado quando não é possível determinar o tipo do arquivo.
+
+    server { ... }: Início da configuração para um bloco de servidor.
+
+        listen 8088;: Define o servidor para escutar na porta 8088.
+
+        server_name intranet.angelita.corp;: Define o nome do servidor para "intranet.angelita.corp".
+
+        location / { ... }: Configuração para a raiz do servidor.
+
+            root /home;: Define o diretório raiz para este bloco de servidor como "/home".
+
+            index index.html;: Define o arquivo de índice como "index.html".
+
+        location ~ ^/~(.+?)(/.*)?$ { ... }: Configuração para lidar com URLs que começam com "/~".
+
+            alias /home/$1/public_html$2;: Usa expressões regulares para mapear a URL para um diretório no sistema de arquivos.
+
+            index index.html;: Define o arquivo de índice como "index.html".
+
+            autoindex on;: Ativa a listagem automática de diretórios.
+
+    include /etc/nginx/conf.d/*.conf;: Inclui arquivos de configuração adicionais para servidores virtuais.
+
+    include /etc/nginx/sites-enabled/*;: Inclui arquivos de configuração para servidores virtuais habilitados.
+
+
+web-server/nginx.conf
+    user www-data;: Define o usuário sob o qual o processo do Nginx será executado. Em sistemas Unix-like, www-data é comumente usado para servidores web.
+
+    worker_processes auto;: Especifica o número de processos de trabalho que o Nginx deve iniciar automaticamente. O valor "auto" permite que o Nginx ajuste automaticamente o número de processos com base nas características do sistema.
+
+    pid /run/nginx.pid;: Especifica o caminho para o arquivo PID (Process ID) do processo principal do Nginx. Este arquivo contém o ID do processo principal, facilitando a gestão do servidor.
+
+    error_log /var/log/nginx/error.log;: Define o caminho para o arquivo de log de erros do Nginx. Erros serão registrados em "/var/log/nginx/error.log".
+
+    include /etc/nginx/modules-enabled/*.conf;: Inclui arquivos de configuração de módulos habilitados.
+
+    events { ... }: Início da configuração para o bloco de eventos no Nginx. Configurações relacionadas a eventos, como conexões, são definidas dentro deste bloco.
+        worker_connections 768;: Limita o número de conexões simultâneas que cada processo de trabalho pode manipular.
+
+    http { ... }: Início da configuração para o bloco HTTP.
+
+        Basic Settings:
+            sendfile on;: Ativa a diretiva sendfile, otimizando a transferência de arquivos.
+            tcp_nopush on;: Ativa a diretiva tcp_nopush, otimizando a transmissão de arquivos.
+            types_hash_max_size 2048;: Define o tamanho máximo do hash para os tipos de arquivos.
+            include /etc/nginx/mime.types;: Inclui o arquivo que mapeia extensões de arquivo para tipos MIME.
+            default_type application/octet-stream;: Define o tipo MIME padrão a ser usado quando não é possível determinar o tipo do arquivo.
+
+        Logging Settings:
+            access_log /var/log/nginx/access.log;: Define o caminho para o arquivo de log de acessos do Nginx. Os acessos serão registrados em "/var/log/nginx/access.log".
+            gzip on;: Ativa a compressão Gzip para otimizar a transferência de dados.
+
+        Server Block (HTTP):
+            listen 80;: O servidor escutará na porta 80.
+            server_name www.angelita.corp;: Define o nome do servidor como "www.angelita.corp".
+            location / { ... }: Configuração para a raiz do servidor.
+
+        Server Block (HTTPS):
+
+            listen 443 ssl;: O servidor escutará na porta 443 usando SSL/TLS.
+
+            SSL Settings:
+                ssl_certificate /etc/nginx/public.pem; e ssl_certificate_key /etc/nginx/private.pem;: Especifica os caminhos para o certificado público e a chave privada SSL.
+                ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;: Define os protocolos SSL/TLS permitidos.
+                ssl_prefer_server_ciphers on;: Indica ao servidor preferir ciphers fornecidos pelo cliente.
+
+            location / { ... }: Configuração para a raiz do servidor HTTPS.
+
+        Virtual Host Configs:
+            include /etc/nginx/conf.d/*.conf;: Inclui arquivos de configuração adicionais para servidores virtuais.
+            include /etc/nginx/sites-enabled/*;: Inclui arquivos de configuração para servidores virtuais habilitados.
+
+
+docker build -t dns-projetoredes .
+docker run -d --rm --name=dns-master --net=projetoredes --ip=192.0.2.2 -v ${PWD}:/home dns-projetoredes
+
+docker build -t web-server .
+docker run -d --rm --name=web --net=projetoredes --ip=192.0.2.10  web-server
+
+docker build -t web-server .
+docker run -d --rm --name=intranet --net=projetoredes --ip=192.0.2.30  intra

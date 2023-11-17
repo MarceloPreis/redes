@@ -1,0 +1,18 @@
+$TTL 1D
+@ IN SOA dns-server. admin.angelita.corp. (
+    2023111501 ; Serial
+    3H ; Refresh
+    15M ; Retry
+    1W ; Expire
+    1D ; Minimum TTL
+)
+
+@ IN NS dns-server.
+@ IN A 192.0.2.2
+@ IN AAAA 2001:0db8:abcd:ef01:0123:4567:89ab:cdef
+www IN A 192.0.2.10
+intranet IN A 192.0.2.30 ; Adiciona uma entrada A para intranet.angelita.corp
+mail IN A 192.0.2.20
+mail IN AAAA 2001:0db8:abcd:ef01:0123:4567:89ab:cdef
+@ IN MX 10 mail.angelita.corp
+ftp IN CNAME www.angelita.corp
